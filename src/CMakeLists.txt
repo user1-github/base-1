@@ -1,191 +1,53 @@
-# 3.6+ needed for pkg-config's IMPORTED targets, as well as IMPORTED targets for zlib
-# 3.8+ needed for OpenGL's IMPORTED targets
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.5)
 
 # set compile options
-set(COMMON_C_FLAGS "-Wall -fsigned-char")
-set(COMMON_CXX_FLAGS "-fno-rtti -ffast-math -fexceptions")
+set(CMAKE_CXX_FLAGS "-O3 -fomit-frame-pointer -ffast-math -Wall -fsigned-char -fno-rtti")
 
-# "fix" (well, hide) annoying GL deprecation warnings spam on macOS
-if(APPLE)
-    message(WARNING "macOS build detected, hiding annoying GL deprecation warnings")
-    set(COMMON_CXX_FLAGS "${COMMON_CXX_FLAGS} -DGL_SILENCE_DEPRECATION")
-endif()
+# Use pkg-config to configure dependencies later
+find_package(PkgConfig REQUIRED)
+# the dependencies required by all platforms
+set(client_deps zlib sdl2 SDL2_image SDL2_mixer gl libenet)
 
+# the client depends on almost all the source files
+file(GLOB client_sources engine/*.cpp game/*.cpp shared/*.cpp)
 
-if(CMAKE_BUILD_TYPE MATCHES RELEASE)
-    message(STATUS "Release build detected, adding release flags")
-    set(COMMON_C_FLAGS "${CMAKE_C_FLAGS} -O2 -fomit-frame-pointer -fstack-protector-all -fpic -fpie -D_FORTIFY_SOURCE=2")
-    if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-        set(COMMON_C_FLAGS "${ADDITIONAL_BUILD_FLAGS} -D_GLIBCXX_ASSERTIONS")
-    endif()
-    # TODO: "-Wl,-pie" and LTO
-    # Add RELRO, disable lazy binding, reject underlinking and use PIE
-    set(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,relro -Wl,-z,now -Wl,-z,defs -pie")
-endif()
-
-option(PEDANTIC "Enable pedantic mode")
-if(PEDANTIC)
-    message(STATUS "Enabling pedantic mode")
-    if(CMAKE_CXX_COMPILER_ID MATCHES GNU)
-        set(COMMON_C_FLAGS "${ADDITIONAL_BUILD_FLAGS} -Wextra")
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES Clang)
-        set(COMMON_C_FLAGS "${ADDITIONAL_BUILD_FLAGS} -Wpedantic")
-    else()
-        message(FATAL_ERROR "Pedantic mode requested, but no configuration available for compiler identification '${CMAKE_CXX_COMPILER_ID}'")
-    endif()
-endif()
-
-option(HARDENED "Enable hardening options")
-if(HARDENED)
-    message(STATUS "Enabling hardening options")
-    if(CMAKE_CXX_COMPILER_ID MATCHES GNU)
-        set(COMMON_C_FLAGS "${ADDITIONAL_BUILD_FLAGS} -fstack-clash-protection")
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES Clang)
-        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 10)
-            set(COMMON_C_FLAGS "${ADDITIONAL_BUILD_FLAGS} -fstack-clash-protection -fsanitize=safe-stack -mretpoline -mspeculative-load-hardening -mlvi-cfi")
-            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=safe-stack -mspeculative-load-hardening -mlvi-cfi")
-        else()
-            message(FATAL_ERROR "Stack clash protection and LVI mitigation availible from Clang 11 onwards, installed version is '${CMAKE_CXX_COMPILER_VERSION}'")
-        endif()
-    else()
-        message(FATAL_ERROR "Additional hardening options requested, but no configuration available for compiler identification '${CMAKE_CXX_COMPILER_ID}'")
-    endif()
-endif()
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${COMMON_C_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMMON_C_FLAGS} ${COMMON_CXX_FLAGS}")
-
-# override from outside or in the platform specific code to exclude targets from being built
-set(BUILD_CLIENT ON CACHE STRING "Build client")
-set(BUILD_SERVER ON CACHE STRING "Build server")
-set(BUILD_GENKEY ON CACHE STRING "Build genkey")
-
-# we use find_package instead of pkg_check_modules etc. so we do not depend on .pc files for libraries used across all platforms
-# this allows for easier cross-compiling with MinGW, as we can use the precompiled libraries
-find_package(ZLIB REQUIRED)
-
-# OpenGL may be imported with pkg-config on Unix, but that doesn't work on macOS
-set(OpenGL_GL_PREFERENCE LEGACY)
-
-# for SDL2* we need to ship custom configs
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-if(BUILD_CLIENT)
-    find_package(SDL2 REQUIRED)
-    find_package(SDL2_image REQUIRED)
-    find_package(SDL2_mixer REQUIRED)
-    find_package(OpenGL REQUIRED)
-endif()
-
-# import enet
-# note that we have to include this before setting CMAKE_EXECUTABLE_SUFFIX
-# otherwise, enet's platform tests fail with cryptic error messages
-set(ENET_SOURCE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/enet)
-add_subdirectory(${ENET_SOURCE_DIRECTORY} EXCLUDE_FROM_ALL)
+# neither server nor client need genkey.cpp
+# to avoid warnings about duplicate main()s, it has to be removed from their source lists
+file(GLOB genkey_cpp_path engine/genkey.cpp)
+list(REMOVE_ITEM client_sources ${genkey_cpp_path})
 
 # platform specific code
-# the binary suffix is appended to all executables' filenames
-# note: CUSTOM_EXECUTABLE_SUFFIX is meant for packagers (e.g., distros, Flatpak, homebrew, ...)
-# as they may want to set this to an empty string, it is impossible to have them just set CMAKE_EXECUTABLE_SUFFIX to an empty string
-if(DEFINED CUSTOM_EXECUTABLE_SUFFIX)
-    set(CMAKE_EXECUTABLE_SUFFIX "${CUSTOM_EXECUTABLE_SUFFIX}")
-    message(WARNING "Executable suffix set externally to '${CMAKE_EXECUTABLE_SUFFIX}'")
-else()
-    if("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
-        set(CMAKE_EXECUTABLE_SUFFIX "_linux")
-    elseif(APPLE)
-        set(CMAKE_EXECUTABLE_SUFFIX "_osx")
-
-        # TODO: fix genkey on macOS
-        set(BUILD_GENKEY OFF)
-    elseif(MINGW)
-        set(CMAKE_EXECUTABLE_SUFFIX "_windows.exe")
-    else()
-        message(WARNING "Unknown build platform")
-        set(CMAKE_EXECUTABLE_SUFFIX "_unknown")
-    endif()
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    link_libraries(rt)
+    set(BIN_SUFFIX "_linux")
 endif()
 
-message(STATUS "Detected executable suffix: ${CMAKE_EXECUTABLE_SUFFIX}")
+# configure dependencies with pkg-config
+foreach(dep IN LISTS client_deps)
+    pkg_check_modules(${dep} REQUIRED ${dep})
+
+    # add the necessary includes
+    foreach(include_dir IN LISTS ${dep}_INCLUDE_DIRS)
+        include_directories(${include_dir})
+    endforeach(include_dir)
+
+    # link to the libraries
+    foreach(lib IN LISTS ${dep}_LIBRARIES)
+        link_libraries(${lib})
+    endforeach(lib)
+
+    # tell the compiler where to find the libraries' binaries
+    foreach(lib_dir IN LISTS ${dep}_LIBRARY_DIRS)
+        link_directories(${lib_dir})
+    endforeach(lib_dir)
+endforeach(dep)
 
 # configure local includes
 include_directories(
-    ${ENET_SOURCE_DIRECTORY}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/engine
     ${CMAKE_CURRENT_SOURCE_DIR}/game
     ${CMAKE_CURRENT_SOURCE_DIR}/shared
 )
 
-# include the headers for the libraries bundled in ../bin
-if(MINGW)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-endif()
-
-# most executables share some of their configuration
-# therefore we define our own function to add and configure them
-function(add_blue_nebula_executable target)
-    add_executable(${target} ${ARGN})
-
-    set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
-
-    if(APPLE)
-        # include framework required in xcode/ code
-        find_library(COCOA_LIBRARY Cocoa)
-        target_link_libraries(${target} ${COCOA_LIBRARY})
-    elseif(WIN32 OR MINGW)
-        target_link_libraries(${target} ws2_32 winmm shlwapi)
-    endif()
-
-    install(
-        TARGETS ${target}
-        RUNTIME DESTINATION bin
-    )
-endfunction()
-
-function(add_windows_rc_file target)
-    if(MINGW OR WIN32)
-        target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/install/win/blue-nebula.rc)
-    endif()
-endfunction()
-
-# APPNAME is the name of the executable -- determines the executable names and is also needed in configure_file below
-set(APPNAME "blue-nebula")
-
-# the specific applications configuration is a bit complex, so it's been split into three separate CMake files
-include(cmake/build_client.cmake)
-include(cmake/build_server.cmake)
-include(cmake/build_genkey.cmake)
-
-# install config directory with the cubescript files (containing the menu definitions etc.)
-install(
-    DIRECTORY ${PROJECT_SOURCE_DIR}/config
-    DESTINATION share/blue-nebula
-)
-
-# install config for data files
-# the if below allows for testing the install config without having to copy too many files
-if(SKIP_INSTALL_DATA)
-    message(WARNING "not installing any game data")
-else()
-    install(
-        DIRECTORY ${PROJECT_SOURCE_DIR}/data
-        DESTINATION share/blue-nebula
-        PATTERN ".git*" EXCLUDE
-    )
-endif()
-
-# install configs were moved into separate CMake files
-include(cmake/install_nix.cmake)
-include(cmake/install_win.cmake)
-
-# general CPack configuration
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/cpack_general.cmake)
-
-# add support for release archive generation
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/cpack_archive.cmake)
-
-# support Windows installer generation
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/cpack_nsis.cmake)
-
-# must be the last instruction
-include(CPack)
+# add the client executable
+add_executable(blue-nebula${BIN_SUFFIX} ${client_sources})
