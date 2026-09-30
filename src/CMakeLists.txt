@@ -1,53 +1,99 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 4.0)
 
-# set compile options
-set(CMAKE_CXX_FLAGS "-O3 -fomit-frame-pointer -ffast-math -Wall -fsigned-char -fno-rtti")
+project(Blue_Nebula LANGUAGES CXX)
 
-# Use pkg-config to configure dependencies later
+find_package(SDL2 REQUIRED)
+find_package(SDL2_image REQUIRED)
+find_package(SDL2_mixer REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(ZLIB REQUIRED)
+
 find_package(PkgConfig REQUIRED)
-# the dependencies required by all platforms
-set(client_deps zlib sdl2 SDL2_image SDL2_mixer gl libenet)
+pkg_check_modules(ENET REQUIRED IMPORTED_TARGET libenet)
 
-# the client depends on almost all the source files
-file(GLOB client_sources engine/*.cpp game/*.cpp shared/*.cpp)
-
-# neither server nor client need genkey.cpp
-# to avoid warnings about duplicate main()s, it has to be removed from their source lists
-file(GLOB genkey_cpp_path engine/genkey.cpp)
-list(REMOVE_ITEM client_sources ${genkey_cpp_path})
-
-# platform specific code
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    link_libraries(rt)
-    set(BIN_SUFFIX "_linux")
-endif()
-
-# configure dependencies with pkg-config
-foreach(dep IN LISTS client_deps)
-    pkg_check_modules(${dep} REQUIRED ${dep})
-
-    # add the necessary includes
-    foreach(include_dir IN LISTS ${dep}_INCLUDE_DIRS)
-        include_directories(${include_dir})
-    endforeach(include_dir)
-
-    # link to the libraries
-    foreach(lib IN LISTS ${dep}_LIBRARIES)
-        link_libraries(${lib})
-    endforeach(lib)
-
-    # tell the compiler where to find the libraries' binaries
-    foreach(lib_dir IN LISTS ${dep}_LIBRARY_DIRS)
-        link_directories(${lib_dir})
-    endforeach(lib_dir)
-endforeach(dep)
-
-# configure local includes
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/engine
-    ${CMAKE_CURRENT_SOURCE_DIR}/game
-    ${CMAKE_CURRENT_SOURCE_DIR}/shared
+add_executable(bn_client
+    engine/bih.cpp
+    engine/blend.cpp
+    engine/blob.cpp
+    engine/client.cpp
+    engine/command.cpp
+    engine/console.cpp
+    engine/decal.cpp
+    engine/dynlight.cpp
+    engine/glare.cpp
+    engine/grass.cpp
+    engine/irc.cpp
+    engine/lightmap.cpp
+    engine/main.cpp
+    engine/master.cpp
+    engine/material.cpp
+    engine/menus.cpp
+    engine/normal.cpp
+    engine/octa.cpp
+    engine/octaedit.cpp
+    engine/octarender.cpp
+    engine/physics.cpp
+    engine/pvs.cpp
+    engine/rendergl.cpp
+    engine/rendermodel.cpp
+    engine/renderparticles.cpp
+    engine/rendersky.cpp
+    engine/rendertext.cpp
+    engine/renderva.cpp
+    engine/server.cpp
+    engine/serverbrowser.cpp
+    engine/shader.cpp
+    engine/shadowmap.cpp
+    engine/sound.cpp
+    engine/texture.cpp
+    engine/ui.cpp
+    engine/water.cpp
+    engine/world.cpp
+    engine/worldio.cpp
+    game/ai.cpp
+    game/bomber.cpp
+    game/capture.cpp
+    game/client.cpp
+    game/defend.cpp
+    game/entities.cpp
+    game/game.cpp
+    game/hud.cpp
+    game/physics.cpp
+    game/projs.cpp
+    game/scoreboard.cpp
+    game/server.cpp
+    game/waypoint.cpp
+    game/weapons.cpp
+    shared/crypto.cpp
+    shared/geom.cpp
+    shared/glemu.cpp
+    shared/stream.cpp
+    shared/tools.cpp
+    shared/zip.cpp
 )
 
-# add the client executable
-add_executable(blue-nebula${BIN_SUFFIX} ${client_sources})
+target_include_directories(bn_client PRIVATE
+    engine
+    game
+    shared
+)
+
+target_link_libraries(bn_client PRIVATE
+    SDL2::SDL2
+    SDL2_image::SDL2_image
+    SDL2_mixer::SDL2_mixer
+    OpenGL::OpenGL
+    ZLIB::ZLIB
+    PkgConfig::ENET
+    rt
+)
+
+target_compile_options(bn_client PRIVATE
+    -O3
+    -fomit-frame-pointer
+    -ffast-math
+    -Wall
+    -fsigned-char
+    -fno-exceptions
+    -fno-rtti
+)
