@@ -11,7 +11,7 @@ find_package(ZLIB REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(ENET REQUIRED IMPORTED_TARGET libenet)
 
-add_executable(bn_client
+add_executable(client
     engine/bih.cpp
     engine/blend.cpp
     engine/blob.cpp
@@ -72,13 +72,13 @@ add_executable(bn_client
     shared/zip.cpp
 )
 
-target_include_directories(bn_client PRIVATE
+target_include_directories(client PRIVATE
     engine
     game
     shared
 )
 
-target_link_libraries(bn_client PRIVATE
+target_link_libraries(client PRIVATE
     SDL2::SDL2
     SDL2_image::SDL2_image
     SDL2_mixer::SDL2_mixer
@@ -88,7 +88,7 @@ target_link_libraries(bn_client PRIVATE
     rt
 )
 
-target_compile_options(bn_client PRIVATE
+target_compile_options(client PRIVATE
     -O3
     -fomit-frame-pointer
     -ffast-math
