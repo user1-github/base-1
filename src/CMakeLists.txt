@@ -15,7 +15,7 @@ endif()
 
 if(CMAKE_BUILD_TYPE MATCHES Release)
     message(STATUS "Release build detected, adding release flags")
-    set(COMMON_C_FLAGS "${CMAKE_C_FLAGS} -O2 -fomit-frame-pointer -fstack-protector-all -fpic -fpie -D_FORTIFY_SOURCE=2")
+    set(COMMON_C_FLAGS "${COMMON_C_FLAGS} -O2 -fomit-frame-pointer -fstack-protector-all -fpic -fpie -D_FORTIFY_SOURCE=2")
     if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         set(COMMON_C_FLAGS "${COMMON_C_FLAGS} -D_GLIBCXX_ASSERTIONS")
     endif()
