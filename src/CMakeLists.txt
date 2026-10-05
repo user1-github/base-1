@@ -68,8 +68,6 @@ find_package(ZLIB REQUIRED)
 # OpenGL may be imported with pkg-config on Unix, but that doesn't work on macOS
 set(OpenGL_GL_PREFERENCE LEGACY)
 
-# for SDL2* we need to ship custom configs
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 if(BUILD_CLIENT)
     find_package(SDL2 REQUIRED)
     find_package(SDL2_image REQUIRED)
