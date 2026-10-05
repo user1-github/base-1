@@ -18,10 +18,10 @@ if(CMAKE_BUILD_TYPE MATCHES Release)
     set(COMMON_C_FLAGS "${COMMON_C_FLAGS} -O2 -fomit-frame-pointer -fstack-protector-all -fpic -fpie -D_FORTIFY_SOURCE=2")
     if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         set(COMMON_C_FLAGS "${COMMON_C_FLAGS} -D_GLIBCXX_ASSERTIONS")
+        # TODO: "-Wl,-pie" and LTO
+        # Add RELRO, disable lazy binding, reject underlinking and use PIE
+        set(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,relro -Wl,-z,now -Wl,-z,defs -pie")
     endif()
-    # TODO: "-Wl,-pie" and LTO
-    # Add RELRO, disable lazy binding, reject underlinking and use PIE
-    set(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,relro -Wl,-z,now -Wl,-z,defs -pie")
 endif()
 
 option(Pedantic "Enable pedantic mode")
