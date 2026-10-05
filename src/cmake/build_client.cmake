@@ -118,7 +118,7 @@ if(BUILD_CLIENT)
 
     # dependencies are imported globally in src/CMakeLists.txt
     # we can just list them by name here
-    set(client_deps ZLIB::ZLIB SDL2::Main SDL2::Image SDL2::Mixer OpenGL::GL enet)
+    set(client_deps ZLIB::ZLIB SDL2::SDL2 SDL2_image::SDL2_image SDL2_mixer::SDL2_mixer OpenGL::GL enet)
 
     # platform specific code
     if(APPLE)
