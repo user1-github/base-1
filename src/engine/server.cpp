@@ -1730,9 +1730,9 @@ void setlocations(bool wanthome) {
                 sethomedir(s);
             }
 #else
-            const char* dir = getenv("HOME");
+            const char* dir = getenv("XDG_DATA_HOME");
             if (dir != NULL && dir[0] != '\0') {
-                defformatstring(s, "%s/.%s", dir, versionuname);
+                defformatstring(s, "%s/%s", dir, versionuname);
                 sethomedir(s);
             }
 #endif
