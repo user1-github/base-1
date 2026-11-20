@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_C_FLAGS "-fomit-frame-pointer")
-set(CMAKE_CXX_FLAGS "-fomit-frame-pointer -ffast-math -Wall -fsigned-char -fexceptions -fno-rtti")
+set(CMAKE_CXX_FLAGS "-fomit-frame-pointer -ffast-math -Wall -fsigned-char -fno-exceptions -fno-rtti")
 
 find_package(ZLIB REQUIRED)
 find_package(SDL2 REQUIRED)
